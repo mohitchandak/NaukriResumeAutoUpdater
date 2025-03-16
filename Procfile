@@ -1,1 +1,0 @@
-web: java -jar target/nakuri-1.0-SNAPSHOT.jar
