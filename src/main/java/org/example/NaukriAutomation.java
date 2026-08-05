@@ -76,7 +76,7 @@ public class NaukriAutomation {
 
             Instant otpNotBefore = Instant.now();
             if (preferOtpLogin) {
-                loginWithOtpButton(wait, otpNotBefore);
+                loginWithOtpButton(wait, email, otpNotBefore);
             } else {
                 loginWithPassword(wait, password, otpNotBefore);
             }
@@ -108,15 +108,41 @@ public class NaukriAutomation {
         handleMfaOtpIfPresent(otpNotBefore);
     }
 
-    /** Email field + "Use OTP to Login" — reads the emailed code from Gmail. */
-    private void loginWithOtpButton(WebDriverWait wait, Instant otpNotBefore) throws Exception {
+    /** Prefer email OTP: may land on mobile OTP first, then switch to email. */
+    private void loginWithOtpButton(WebDriverWait wait, String email, Instant otpNotBefore) throws Exception {
         if (otpReader == null) {
             throw new IllegalStateException("OTP login requires GMAIL_APP_PASSWORD");
         }
 
         WebElement otpLoginButton = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("button.otpButton")));
         otpLoginButton.click();
-        logger.info("Clicked 'Use OTP to Login' — waiting for OTP inputs and Gmail code");
+        logger.info("Clicked 'Use OTP to Login'");
+
+        // Naukri often shows mobile OTP first — switch to email OTP
+        try {
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
+            WebElement useEmail = shortWait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//button[contains(.,'Use Email to Login') or contains(@class,'email-btn')]")
+            ));
+            useEmail.click();
+            logger.info("Clicked 'Use Email to Login'");
+        } catch (Exception e) {
+            logger.info("No mobile-OTP intermediate screen (or already on email OTP)");
+        }
+
+        // On email OTP screen: fill email and click Get OTP if needed
+        if (driver.findElements(By.id("Input_1")).isEmpty()
+                || driver.findElements(By.id("Input_1")).stream().noneMatch(WebElement::isDisplayed)) {
+            WebElement emailField = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("usernameField")));
+            emailField.clear();
+            emailField.sendKeys(email);
+
+            WebElement getOtp = wait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//button[contains(.,'Get OTP')]")
+            ));
+            getOtp.click();
+            logger.info("Clicked Get OTP for email");
+        }
 
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("Input_1")));
         enterOtpFromGmail(otpNotBefore);
