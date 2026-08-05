@@ -3,9 +3,9 @@ name: Naukri Auto Updater
 on:
   workflow_dispatch:
   schedule:
-    # Hourly 9:00–19:00 IST (03:30–13:30 UTC), every day
+    # Hourly 9:00–19:00 IST (03:30–13:30 UTC), Monday–Friday
     # GitHub cron is always UTC; IST = UTC+5:30
-    - cron: '30 3-13 * * *'
+    - cron: '30 3-13 * * 1-5'
 
 jobs:
   run-updater:
