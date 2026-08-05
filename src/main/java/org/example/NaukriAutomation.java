@@ -59,6 +59,7 @@ public class NaukriAutomation {
         );
     }
 
+    /** Always uses email + password + Login (not "Use OTP to Login"). */
     public void login(String email, String password) {
         try {
             driver.get("https://www.naukri.com/nlogin/login");
@@ -75,10 +76,16 @@ public class NaukriAutomation {
             passwordField.sendKeys(password);
 
             Instant otpNotBefore = Instant.now();
-            WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//button[@type='submit']")));
+            // Both Login and "Use OTP to Login" are type=submit — click Login only
+            WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//button[@type='submit' and not(contains(@class,'otpButton'))]")
+            ));
             loginButton.click();
+            logger.info("Submitted email + password login");
 
-            handleOtpIfPresent(otpNotBefore);
+            // Rare on home IP; common on GitHub Actions datacenter IPs
+            handleMfaOtpIfPresent(otpNotBefore);
+
             waitForLoggedInState(wait);
             logger.info("Logged in successfully");
         } catch (Exception e) {
@@ -91,6 +98,45 @@ public class NaukriAutomation {
             }
             throw new RuntimeException(e);
         }
+    }
+
+    private void handleMfaOtpIfPresent(Instant otpNotBefore) throws Exception {
+        WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(12));
+        try {
+            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.id("Input_1")));
+        } catch (Exception e) {
+            logger.info("No extra OTP after password login");
+            return;
+        }
+
+        logger.info("Naukri showed an extra verification OTP after password login");
+        if (otpReader == null) {
+            throw new IllegalStateException(
+                    "Naukri asked for email OTP (usually on new/cloud IPs). "
+                            + "Set GMAIL_APP_PASSWORD to auto-read it, or run from a trusted network."
+            );
+        }
+
+        String otp = otpReader.waitForOtp(otpNotBefore);
+        logger.info("Fetched OTP from Gmail");
+
+        for (int i = 0; i < Math.min(6, otp.length()); i++) {
+            WebElement box = driver.findElement(By.id("Input_" + (i + 1)));
+            box.clear();
+            box.sendKeys(String.valueOf(otp.charAt(i)));
+        }
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        List<WebElement> verifyButtons = driver.findElements(By.cssSelector("button.verify-button"));
+        if (!verifyButtons.isEmpty()) {
+            wait.until(ExpectedConditions.elementToBeClickable(verifyButtons.get(0)));
+            verifyButtons.get(0).click();
+        } else {
+            wait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//button[contains(.,'Verify')]")
+            )).click();
+        }
+        logger.info("Submitted verification OTP");
     }
 
     public void uploadResume(String resumePath) throws InterruptedException {
@@ -128,50 +174,6 @@ public class NaukriAutomation {
         }
     }
 
-    private void handleOtpIfPresent(Instant otpNotBefore) throws Exception {
-        WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(12));
-        List<WebElement> otpInputs;
-        try {
-            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.id("Input_1")));
-            otpInputs = driver.findElements(By.cssSelector("input[id^='Input_']"));
-        } catch (Exception e) {
-            logger.info("No OTP challenge detected after password login");
-            return;
-        }
-
-        if (otpInputs.isEmpty()) {
-            return;
-        }
-
-        logger.info("OTP challenge detected — reading code from Gmail");
-        if (otpReader == null) {
-            throw new IllegalStateException("Naukri asked for OTP but GMAIL_APP_PASSWORD is not configured");
-        }
-
-        String otp = otpReader.waitForOtp(otpNotBefore);
-        logger.info("Fetched OTP from Gmail");
-
-        for (int i = 0; i < Math.min(6, otp.length()); i++) {
-            String id = "Input_" + (i + 1);
-            WebElement box = driver.findElement(By.id(id));
-            box.clear();
-            box.sendKeys(String.valueOf(otp.charAt(i)));
-        }
-
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
-        WebElement verify = wait.until(ExpectedConditions.elementToBeClickable(
-                By.cssSelector("button.verify-button, button[type='submit']")
-        ));
-        // Prefer the Verify button when present
-        List<WebElement> verifyButtons = driver.findElements(By.cssSelector("button.verify-button"));
-        if (!verifyButtons.isEmpty() && verifyButtons.get(0).isEnabled()) {
-            verifyButtons.get(0).click();
-        } else {
-            verify.click();
-        }
-        logger.info("Submitted OTP");
-    }
-
     private void waitForLoggedInState(WebDriverWait wait) {
         wait.until(driver -> {
             if (!driver.findElements(By.id("Input_1")).isEmpty()
@@ -196,7 +198,7 @@ public class NaukriAutomation {
                 return true;
             }
         } catch (Exception ignored) {
-            // fall through to direct navigation
+            // fall through
         }
 
         driver.get(PROFILE_URL);

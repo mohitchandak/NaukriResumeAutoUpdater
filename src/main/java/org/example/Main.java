@@ -26,9 +26,7 @@ public class Main {
                 GmailOtpReader otpReader = null;
                 if (config.hasGmailOtpConfig()) {
                     otpReader = new GmailOtpReader(config.getGmailAddress(), config.getGmailAppPassword());
-                    System.out.println("Gmail OTP reader enabled for " + config.getGmailAddress());
-                } else {
-                    System.out.println("Gmail OTP reader not configured (set GMAIL_APP_PASSWORD for CI OTP logins)");
+                    System.out.println("Gmail OTP fallback enabled (only used if Naukri asks after password login)");
                 }
                 naukri = new NaukriAutomation(config.isHeadless(), otpReader);
                 naukri.login(config.getEmail(), config.getPassword());
