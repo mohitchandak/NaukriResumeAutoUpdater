@@ -56,18 +56,30 @@ In GitHub: **Settings → Secrets and variables → Actions → New repository s
 | `GMAIL_ADDRESS` | same Gmail that receives Naukri OTP (optional if same as `NAUKRI_EMAIL`) |
 | `GMAIL_APP_PASSWORD` | Gmail App Password (not your normal Gmail password) |
 
-### Gmail App Password (needed for OTP on Actions)
+### Cookie login for GitHub Actions (recommended)
 
-GitHub’s servers often trigger Naukri email OTP. The workflow reads that OTP from Gmail.
+GitHub cloud IPs are often blocked by Naukri captcha. Use a saved browser session instead:
 
-1. Open Google Account → **Security**
-2. Turn on **2-Step Verification** (required)
-3. Create an **App password**: https://myaccount.google.com/apppasswords  
-   - App: Mail  
-   - Device: Other → `NaukriUpdater`
-4. Copy the 16-character password
-5. Add it as GitHub secret `GMAIL_APP_PASSWORD`
-6. Optionally set `GMAIL_ADDRESS` (defaults to `NAUKRI_EMAIL`)
+1. On your PC (works with email+password), export cookies:
+   ```bash
+   mvn -B clean package -q
+   java -jar target/nakuri-1.0-SNAPSHOT.jar --export-cookies
+   ```
+   This creates `naukri-cookies.json` (gitignored).
+
+2. Upload as a secret:
+   ```bash
+   gh secret set NAUKRI_COOKIES < naukri-cookies.json
+   ```
+
+3. Actions will reuse that session and skip login. When it expires, repeat steps 1–2.
+
+| Secret | Required |
+|--------|----------|
+| `NAUKRI_COOKIES` | Yes for cloud |
+| `RESUME_FILE_NAME` | Yes |
+| `RESUME_PDF_URL` | Fallback only if `resume/` PDF missing |
+| `NAUKRI_EMAIL` / `NAUKRI_PASSWORD` | Only for local cookie export |
 
 ### 3. Verify
 

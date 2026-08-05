@@ -217,11 +217,45 @@ public class NaukriAutomation {
         }
     }
 
+    public void loginWithCookies(String cookiesJsonOrBase64) {
+        try {
+            SessionCookies.applyFromJson(driver, cookiesJsonOrBase64);
+            driver.get(PROFILE_URL);
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+            // If redirected to login, cookies are expired/invalid
+            wait.until(d -> {
+                String url = d.getCurrentUrl();
+                return url != null && !url.contains("/nlogin/");
+            });
+            if (!driver.findElements(By.id("usernameField")).isEmpty()
+                    && driver.findElement(By.id("usernameField")).isDisplayed()) {
+                throw new IllegalStateException("Cookie session is not logged in (login form visible)");
+            }
+            logger.info("Logged in using saved session cookies");
+        } catch (Exception e) {
+            logger.severe("Cookie login failed: " + e.getMessage());
+            logger.severe("Current URL: " + safeCurrentUrl());
+            saveDebugArtifacts("cookie-login-failure");
+            throw new IllegalStateException(
+                    "NAUKRI_COOKIES expired or invalid. Re-export cookies locally and update the GitHub secret.", e
+            );
+        }
+    }
+
+    public void exportCookies(Path path) throws IOException {
+        SessionCookies.saveToFile(driver, path);
+        logger.info("Saved session cookies to " + path.toAbsolutePath());
+    }
+
     public void quit() {
         if (driver != null) {
             driver.quit();
             logger.info("WebDriver closed");
         }
+    }
+
+    public WebDriver getDriver() {
+        return driver;
     }
 
     private void waitForLoggedInState(WebDriverWait wait) {

@@ -11,6 +11,9 @@ config.properties
 # Selenium failure dumps from CI/local
 debug/
 
+# Saved Naukri login session (secret — never commit)
+naukri-cookies.json
+
 # IDE / OS
 .idea/
 *.iml

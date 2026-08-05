@@ -2,6 +2,9 @@ package org.example;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 public class Config {
@@ -13,6 +16,7 @@ public class Config {
     private final boolean headless;
     private final String gmailAddress;
     private final String gmailAppPassword;
+    private final String sessionCookies;
 
     public Config() {
         Properties props = new Properties();
@@ -26,8 +30,8 @@ public class Config {
             }
         }
 
-        this.email = readRequiredValue("naukri.user.email", "NAUKRI_EMAIL", props);
-        this.password = readRequiredValue("naukri.user.password", "NAUKRI_PASSWORD", props);
+        this.email = readOptionalValue("naukri.user.email", "NAUKRI_EMAIL", props);
+        this.password = readOptionalValue("naukri.user.password", "NAUKRI_PASSWORD", props);
         this.resumePdfUrl = readRequiredValue("resume.pdf.url", "RESUME_PDF_URL", props);
         this.resumeFileName = readRequiredValue("resume.file.name", "RESUME_FILE_NAME", props);
 
@@ -38,8 +42,37 @@ public class Config {
         this.headless = Boolean.parseBoolean(headlessValue);
 
         String gmail = readOptionalValue("gmail.address", "GMAIL_ADDRESS", props);
-        this.gmailAddress = (gmail == null || gmail.trim().isEmpty()) ? this.email : gmail.trim();
+        this.gmailAddress = (gmail == null || gmail.trim().isEmpty()) ? (email == null ? "" : email.trim()) : gmail.trim();
         this.gmailAppPassword = readOptionalValue("gmail.app.password", "GMAIL_APP_PASSWORD", props);
+        this.sessionCookies = loadSessionCookies(props);
+
+        if (!hasSessionCookies()) {
+            if (email == null || email.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+                throw new IllegalStateException(
+                        "Set NAUKRI_COOKIES (recommended for GitHub Actions) or naukri.user.email + naukri.user.password for local login"
+                );
+            }
+        }
+    }
+
+    private String loadSessionCookies(Properties props) {
+        String fromEnv = System.getenv("NAUKRI_COOKIES");
+        if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+            return fromEnv.trim();
+        }
+        String fromProps = props.getProperty("naukri.cookies");
+        if (fromProps != null && !fromProps.trim().isEmpty()) {
+            return fromProps.trim();
+        }
+        Path file = Paths.get("naukri-cookies.json");
+        if (Files.isRegularFile(file)) {
+            try {
+                return Files.readString(file).trim();
+            } catch (IOException e) {
+                throw new IllegalStateException("Could not read naukri-cookies.json: " + e.getMessage());
+            }
+        }
+        return null;
     }
 
     private String readRequiredValue(String configKey, String envKey, Properties props) {
@@ -92,5 +125,13 @@ public class Config {
 
     public boolean hasGmailOtpConfig() {
         return gmailAppPassword != null && !gmailAppPassword.trim().isEmpty();
+    }
+
+    public String getSessionCookies() {
+        return sessionCookies;
+    }
+
+    public boolean hasSessionCookies() {
+        return sessionCookies != null && !sessionCookies.trim().isEmpty();
     }
 }

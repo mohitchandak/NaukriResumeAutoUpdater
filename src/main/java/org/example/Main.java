@@ -1,15 +1,20 @@
 package org.example;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 
 public class Main {
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final Path COOKIE_FILE = Paths.get("naukri-cookies.json");
 
     public static void main(String[] args) {
+        boolean exportCookiesOnly = Arrays.asList(args).contains("--export-cookies");
         int exitCode = 0;
         try {
             Config config = new Config();
@@ -24,16 +29,28 @@ public class Main {
             NaukriAutomation naukri = null;
             try {
                 GmailOtpReader otpReader = null;
-                boolean useOtpLogin = config.hasGmailOtpConfig();
-                if (useOtpLogin) {
+                if (config.hasGmailOtpConfig() && !config.hasSessionCookies()) {
                     otpReader = new GmailOtpReader(config.getGmailAddress(), config.getGmailAppPassword());
-                    System.out.println("Using 'Use OTP to Login' + Gmail OTP reader");
-                } else {
-                    System.out.println("Using email + password login (no GMAIL_APP_PASSWORD)");
                 }
                 naukri = new NaukriAutomation(config.isHeadless(), otpReader);
-                naukri.login(config.getEmail(), config.getPassword(), useOtpLogin);
-                naukri.uploadResume(resumePath);
+
+                if (config.hasSessionCookies()) {
+                    System.out.println("Using saved Naukri session cookies (skipping interactive login)");
+                    naukri.loginWithCookies(config.getSessionCookies());
+                } else {
+                    System.out.println("Using email + password login, then saving cookies for Actions");
+                    naukri.login(config.getEmail(), config.getPassword(), false);
+                    naukri.exportCookies(COOKIE_FILE);
+                    System.out.println("Cookies saved to " + COOKIE_FILE.toAbsolutePath());
+                    System.out.println("Upload to GitHub with:");
+                    System.out.println("  gh secret set NAUKRI_COOKIES < naukri-cookies.json");
+                }
+
+                if (!exportCookiesOnly) {
+                    naukri.uploadResume(resumePath);
+                } else {
+                    System.out.println("--export-cookies: skipping resume upload");
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 exitCode = 1;
@@ -55,7 +72,6 @@ public class Main {
         }
     }
 
-    /** Mohit_Chandak_SDET.pdf → Mohit_Chandak_SDET_2026-08-05.pdf (IST date) */
     static String withTodayDate(String fileName) {
         String today = LocalDate.now(IST).format(DATE_FORMAT);
         int dot = fileName.lastIndexOf('.');

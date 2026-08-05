@@ -36,6 +36,7 @@ jobs:
           RESUME_FILE_NAME: ${{ secrets.RESUME_FILE_NAME }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NAUKRI_COOKIES: ${{ secrets.NAUKRI_COOKIES }}
           BROWSER_HEADLESS: 'true'
         run: java -jar target/nakuri-1.0-SNAPSHOT.jar
 
