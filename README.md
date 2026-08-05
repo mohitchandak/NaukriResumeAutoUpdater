@@ -32,11 +32,11 @@ Java + Selenium tool that downloads your resume PDF and uploads it to Naukri. De
    java -jar target/nakuri-1.0-SNAPSHOT.jar
    ```
 
-## GitHub Actions (hourly Mon–Fri, 9 AM–7 PM IST)
+## GitHub Actions (hourly every day, 9 AM–7 PM IST)
 
-The workflow runs **once per hour from 9:00 to 19:00 IST, Monday–Friday**, and can also be triggered manually.
+The workflow runs **automatically once per hour from 9:00 to 19:00 IST, every day**. You can also trigger it manually with **Run workflow**.
 
-Cron used (UTC): `30 3-13 * * 1-5`  
+Cron used (UTC): `30 3-13 * * *`  
 → 03:30–13:30 UTC = 09:00–19:00 IST
 
 ### 1. Push the repo
