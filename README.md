@@ -72,9 +72,11 @@ After that, it runs on the schedule automatically.
 ## What it does
 
 1. Downloads the resume from `RESUME_PDF_URL` / `resume.pdf.url`
-2. Logs in to Naukri
-3. Uploads the resume to your profile
+2. Renames it with today’s IST date (e.g. `Mohit_Chandak_SDET.pdf` → `Mohit_Chandak_SDET_2026-08-05.pdf`)
+3. Logs in to Naukri and uploads that dated file
 4. Exits (scheduling is handled by GitHub Actions, not the Java process)
+
+Keep `RESUME_FILE_NAME` / `resume.file.name` as the base name only (no date) — the date is appended automatically.
 
 ## Project structure
 
