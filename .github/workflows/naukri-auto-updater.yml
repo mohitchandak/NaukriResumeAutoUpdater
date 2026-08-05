@@ -1,0 +1,38 @@
+name: Naukri Auto Updater
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Hourly 9:00–19:00 IST (03:30–13:30 UTC), Monday–Friday
+    # GitHub cron is always UTC; IST = UTC+5:30
+    - cron: '30 3-13 * * 1-5'
+
+jobs:
+  run-updater:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Build project
+        run: mvn -B clean package -q
+
+      - name: Run updater
+        env:
+          NAUKRI_EMAIL: ${{ secrets.NAUKRI_EMAIL }}
+          NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
+          RESUME_PDF_URL: ${{ secrets.RESUME_PDF_URL }}
+          RESUME_FILE_NAME: ${{ secrets.RESUME_FILE_NAME }}
+          BROWSER_HEADLESS: 'true'
+        run: java -jar target/nakuri-1.0-SNAPSHOT.jar

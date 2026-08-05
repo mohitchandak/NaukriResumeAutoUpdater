@@ -1,0 +1,14 @@
+# Build output
+target/
+
+# Local secrets — use GitHub Actions secrets in CI
+config.properties
+
+# Local resume copies
+*.pdf
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

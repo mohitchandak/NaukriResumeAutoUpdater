@@ -1,4 +1,5 @@
 package org.example;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
@@ -9,25 +10,43 @@ public class Config {
     private final String resumePdfUrl;
     private final String resumeFileName;
     private final int runEverySecs;
+    private final boolean headless;
 
     public Config() {
         Properties props = new Properties();
-        try (FileInputStream fis = new FileInputStream("config.properties")) {
-            props.load(fis);
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not load config.properties: " + e.getMessage());
+        File configFile = new File("config.properties");
+
+        if (configFile.exists()) {
+            try (FileInputStream fis = new FileInputStream(configFile)) {
+                props.load(fis);
+            } catch (IOException e) {
+                throw new IllegalStateException("Could not load config.properties: " + e.getMessage());
+            }
         }
 
-        this.email = props.getProperty("naukri.user.email");
-        this.password = props.getProperty("naukri.user.password");
-        this.resumePdfUrl = props.getProperty("resume.pdf.url");
-        this.resumeFileName = props.getProperty("resume.file.name");
-        String runEverySecsStr = props.getProperty("run.every.secs", "10"); // Default to 10 if not set
+        this.email = readRequiredValue("naukri.user.email", "NAUKRI_EMAIL", props);
+        this.password = readRequiredValue("naukri.user.password", "NAUKRI_PASSWORD", props);
+        this.resumePdfUrl = readRequiredValue("resume.pdf.url", "RESUME_PDF_URL", props);
+        this.resumeFileName = readRequiredValue("resume.file.name", "RESUME_FILE_NAME", props);
+
+        String runEverySecsStr = props.getProperty("run.every.secs", System.getenv().getOrDefault("RUN_EVERY_SECS", "10"));
         this.runEverySecs = Integer.parseInt(runEverySecsStr);
 
-        if (email == null || password == null || resumePdfUrl == null || resumeFileName == null) {
-            throw new IllegalStateException("Required properties are missing in config.properties: naukri.user.email, naukri.user.password, resume.pdf.url, resume.file.name");
+        String headlessValue = props.getProperty("browser.headless", System.getenv().getOrDefault("BROWSER_HEADLESS", "true"));
+        this.headless = Boolean.parseBoolean(headlessValue);
+    }
+
+    private String readRequiredValue(String configKey, String envKey, Properties props) {
+        String value = System.getenv(envKey);
+        if (value == null || value.trim().isEmpty()) {
+            value = props.getProperty(configKey);
         }
+
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalStateException("Required configuration is missing. Set either config.properties or the environment variable " + envKey + " for " + configKey);
+        }
+
+        return value;
     }
 
     public String getEmail() {
@@ -48,5 +67,9 @@ public class Config {
 
     public int getRunEverySecs() {
         return runEverySecs;
+    }
+
+    public boolean isHeadless() {
+        return headless;
     }
 }

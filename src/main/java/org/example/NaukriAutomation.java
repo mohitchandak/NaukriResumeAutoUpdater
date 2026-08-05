@@ -16,17 +16,18 @@ public class NaukriAutomation {
     private static final Logger logger = Logger.getLogger(NaukriAutomation.class.getName());
     private WebDriver driver;
 
-    public NaukriAutomation() {
+    public NaukriAutomation(boolean headless) {
         // Setup ChromeDriver using WebDriverManager
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless"); // Run in headless mode
-        options.addArguments("--no-sandbox"); // Required for Heroku
-        options.addArguments("--disable-dev-shm-usage"); // Overcome limited resource issues
+        if (headless) {
+            options.addArguments("--headless=new");
+            options.addArguments("--disable-dev-shm-usage"); // Overcome limited resource issues
+        }
+        options.addArguments("--no-sandbox");
         options.addArguments("--start-maximized");
         options.addArguments("--disable-notifications");
         driver = new ChromeDriver(options);
-
     }
 
     public void login(String email, String password) {

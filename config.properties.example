@@ -1,6 +1,6 @@
-// File: config.properties
 naukri.user.email=your_email@example.com
 naukri.user.password=your_password
 resume.pdf.url=https://example.com/resume.pdf
 resume.file.name=resume.pdf
-run.every.secs=10
+run.every.secs=3600
+browser.headless=true
