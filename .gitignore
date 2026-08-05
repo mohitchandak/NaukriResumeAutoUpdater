@@ -4,8 +4,9 @@ target/
 # Local secrets — use GitHub Actions secrets in CI
 config.properties
 
-# Local resume copies
+# Local/generated dated resume copies
 *.pdf
+!resume/*.pdf
 
 # IDE / OS
 .idea/

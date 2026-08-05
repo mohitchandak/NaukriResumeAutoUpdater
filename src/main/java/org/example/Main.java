@@ -14,7 +14,11 @@ public class Main {
             Config config = new Config();
             String datedFileName = withTodayDate(config.getResumeFileName());
             System.out.println("Using resume file name: " + datedFileName);
-            String resumePath = ResumeDownloader.downloadResume(config.getResumePdfUrl(), datedFileName);
+            String resumePath = ResumeDownloader.resolveResume(
+                    config.getResumePdfUrl(),
+                    config.getResumeFileName(),
+                    datedFileName
+            );
 
             NaukriAutomation naukri = null;
             try {
