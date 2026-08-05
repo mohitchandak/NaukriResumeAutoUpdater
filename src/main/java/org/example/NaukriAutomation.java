@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +27,13 @@ public class NaukriAutomation {
     private static final Logger logger = Logger.getLogger(NaukriAutomation.class.getName());
     private static final String USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private static final String PROFILE_URL = "https://www.naukri.com/mnjuser/profile";
 
-    private WebDriver driver;
+    private final WebDriver driver;
+    private final GmailOtpReader otpReader;
 
-    public NaukriAutomation(boolean headless) {
+    public NaukriAutomation(boolean headless, GmailOtpReader otpReader) {
+        this.otpReader = otpReader;
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = new ChromeOptions();
         if (headless) {
@@ -70,27 +74,33 @@ public class NaukriAutomation {
             passwordField.clear();
             passwordField.sendKeys(password);
 
+            Instant otpNotBefore = Instant.now();
             WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//button[@type='submit']")));
             loginButton.click();
+
+            handleOtpIfPresent(otpNotBefore);
+            waitForLoggedInState(wait);
             logger.info("Logged in successfully");
         } catch (Exception e) {
             logger.severe("Login failed: " + e.getMessage());
             logger.severe("Current URL: " + safeCurrentUrl());
             logger.severe("Page title: " + safeTitle());
             saveDebugArtifacts("login-failure");
-            throw e;
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw new RuntimeException(e);
         }
     }
 
     public void uploadResume(String resumePath) throws InterruptedException {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
         try {
-            String completeProfileXPath = "//div[@class='view-profile-wrapper']/a";
-            WebElement completeProfileButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(completeProfileXPath)));
-            completeProfileButton.click();
-            logger.info("Clicked the 'Complete Profile' button successfully");
+            if (!openProfilePage(wait)) {
+                throw new IllegalStateException("Could not open Naukri profile page after login");
+            }
 
-            String uploadXPath = "//div[@class='uploadContainer']//input[@type='file' and @id='attachCV']";
+            String uploadXPath = "//input[@type='file' and (@id='attachCV' or contains(@id,'attachCV'))]";
             WebElement uploadButton = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(uploadXPath)));
             Thread.sleep(2000);
             JavascriptExecutor jsExecutor = (JavascriptExecutor) driver;
@@ -101,7 +111,7 @@ public class NaukriAutomation {
             logger.info("Resume uploaded successfully");
 
             wait.until(ExpectedConditions.presenceOfElementLocated(
-                    By.xpath("//div[contains(@class, 'updateOn') and contains(text(), 'Uploaded')]")
+                    By.xpath("//*[contains(@class, 'updateOn') and contains(., 'Uploaded')] | //*[contains(text(),'Uploaded')]")
             ));
             logger.info("Upload confirmed on page");
         } catch (Exception e) {
@@ -115,6 +125,90 @@ public class NaukriAutomation {
         if (driver != null) {
             driver.quit();
             logger.info("WebDriver closed");
+        }
+    }
+
+    private void handleOtpIfPresent(Instant otpNotBefore) throws Exception {
+        WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(12));
+        List<WebElement> otpInputs;
+        try {
+            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.id("Input_1")));
+            otpInputs = driver.findElements(By.cssSelector("input[id^='Input_']"));
+        } catch (Exception e) {
+            logger.info("No OTP challenge detected after password login");
+            return;
+        }
+
+        if (otpInputs.isEmpty()) {
+            return;
+        }
+
+        logger.info("OTP challenge detected — reading code from Gmail");
+        if (otpReader == null) {
+            throw new IllegalStateException("Naukri asked for OTP but GMAIL_APP_PASSWORD is not configured");
+        }
+
+        String otp = otpReader.waitForOtp(otpNotBefore);
+        logger.info("Fetched OTP from Gmail");
+
+        for (int i = 0; i < Math.min(6, otp.length()); i++) {
+            String id = "Input_" + (i + 1);
+            WebElement box = driver.findElement(By.id(id));
+            box.clear();
+            box.sendKeys(String.valueOf(otp.charAt(i)));
+        }
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        WebElement verify = wait.until(ExpectedConditions.elementToBeClickable(
+                By.cssSelector("button.verify-button, button[type='submit']")
+        ));
+        // Prefer the Verify button when present
+        List<WebElement> verifyButtons = driver.findElements(By.cssSelector("button.verify-button"));
+        if (!verifyButtons.isEmpty() && verifyButtons.get(0).isEnabled()) {
+            verifyButtons.get(0).click();
+        } else {
+            verify.click();
+        }
+        logger.info("Submitted OTP");
+    }
+
+    private void waitForLoggedInState(WebDriverWait wait) {
+        wait.until(driver -> {
+            if (!driver.findElements(By.id("Input_1")).isEmpty()
+                    && driver.findElement(By.id("Input_1")).isDisplayed()) {
+                return false;
+            }
+            if (!driver.findElements(By.id("usernameField")).isEmpty()
+                    && driver.findElement(By.id("usernameField")).isDisplayed()) {
+                return false;
+            }
+            String url = driver.getCurrentUrl();
+            return url != null && !url.contains("/nlogin/");
+        });
+    }
+
+    private boolean openProfilePage(WebDriverWait wait) {
+        try {
+            List<WebElement> completeProfile = driver.findElements(By.xpath("//div[@class='view-profile-wrapper']/a"));
+            if (!completeProfile.isEmpty() && completeProfile.get(0).isDisplayed()) {
+                completeProfile.get(0).click();
+                logger.info("Clicked the 'Complete Profile' button successfully");
+                return true;
+            }
+        } catch (Exception ignored) {
+            // fall through to direct navigation
+        }
+
+        driver.get(PROFILE_URL);
+        try {
+            wait.until(ExpectedConditions.or(
+                    ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@type='file' and contains(@id,'attachCV')]")),
+                    ExpectedConditions.presenceOfElementLocated(By.cssSelector(".uploadContainer"))
+            ));
+            logger.info("Opened profile page directly");
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

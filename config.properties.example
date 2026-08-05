@@ -4,3 +4,6 @@ resume.pdf.url=https://example.com/resume.pdf
 resume.file.name=resume.pdf
 run.every.secs=3600
 browser.headless=true
+# Gmail App Password for Naukri OTP emails (required on GitHub Actions)
+gmail.address=your_email@example.com
+gmail.app.password=xxxx xxxx xxxx xxxx

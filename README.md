@@ -51,14 +51,29 @@ In GitHub: **Settings → Secrets and variables → Actions → New repository s
 |--------|---------|
 | `NAUKRI_EMAIL` | your Naukri login email |
 | `NAUKRI_PASSWORD` | your Naukri password |
-| `RESUME_PDF_URL` | public/direct download URL of your PDF |
+| `RESUME_PDF_URL` | public/direct download URL of your PDF (fallback) |
 | `RESUME_FILE_NAME` | `Mohit_Chandak_SDET.pdf` |
+| `GMAIL_ADDRESS` | same Gmail that receives Naukri OTP (optional if same as `NAUKRI_EMAIL`) |
+| `GMAIL_APP_PASSWORD` | Gmail App Password (not your normal Gmail password) |
+
+### Gmail App Password (needed for OTP on Actions)
+
+GitHub’s servers often trigger Naukri email OTP. The workflow reads that OTP from Gmail.
+
+1. Open Google Account → **Security**
+2. Turn on **2-Step Verification** (required)
+3. Create an **App password**: https://myaccount.google.com/apppasswords  
+   - App: Mail  
+   - Device: Other → `NaukriUpdater`
+4. Copy the 16-character password
+5. Add it as GitHub secret `GMAIL_APP_PASSWORD`
+6. Optionally set `GMAIL_ADDRESS` (defaults to `NAUKRI_EMAIL`)
 
 ### 3. Verify
 
 1. Open **Actions → Naukri Auto Updater**
 2. Click **Run workflow** (manual test)
-3. Confirm the job succeeds
+3. Confirm the job succeeds (OTP is fetched automatically if shown)
 
 After that, it runs on the schedule automatically.
 
@@ -66,19 +81,20 @@ After that, it runs on the schedule automatically.
 
 - GitHub may delay scheduled jobs by a few minutes.
 - Keep the repo **private** if you prefer; free minutes apply on the free plan.
-- Do not put your password in committed files — use secrets only.
-- `RESUME_PDF_URL` must be a URL that downloads without a login wall (Google Drive “anyone with the link” + `uc?export=download` style links usually work).
+- Do not put passwords in committed files — use secrets only.
+- Prefer bundling the PDF under `resume/` so Actions does not depend on Google Drive.
 
 ## What it does
 
 1. Uses the bundled PDF from `resume/<RESUME_FILE_NAME>` when present (recommended for GitHub Actions), otherwise downloads from `RESUME_PDF_URL`
 2. Renames it with today’s IST date (e.g. `Mohit_Chandak_SDET.pdf` → `Mohit_Chandak_SDET_2026-08-05.pdf`)
-3. Logs in to Naukri and uploads that dated file
-4. Exits (scheduling is handled by GitHub Actions, not the Java process)
+3. Logs in to Naukri; if email OTP is shown, reads it from Gmail and submits it
+4. Uploads the dated resume
+5. Exits (scheduling is handled by GitHub Actions, not the Java process)
 
 Keep `RESUME_FILE_NAME` / `resume.file.name` as the base name only (no date) — the date is appended automatically.
 
-Google Drive downloads often fail on GitHub’s network (`Connection reset`). Bundling the file under `resume/` avoids that. Note: this repo is public, so that PDF is publicly readable.
+Google Drive downloads often fail on GitHub’s network. Bundling the file under `resume/` avoids that. Note: this repo is public, so that PDF is publicly readable.
 
 ## Project structure
 

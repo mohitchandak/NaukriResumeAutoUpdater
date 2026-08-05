@@ -23,7 +23,14 @@ public class Main {
 
             NaukriAutomation naukri = null;
             try {
-                naukri = new NaukriAutomation(config.isHeadless());
+                GmailOtpReader otpReader = null;
+                if (config.hasGmailOtpConfig()) {
+                    otpReader = new GmailOtpReader(config.getGmailAddress(), config.getGmailAppPassword());
+                    System.out.println("Gmail OTP reader enabled for " + config.getGmailAddress());
+                } else {
+                    System.out.println("Gmail OTP reader not configured (set GMAIL_APP_PASSWORD for CI OTP logins)");
+                }
+                naukri = new NaukriAutomation(config.isHeadless(), otpReader);
                 naukri.login(config.getEmail(), config.getPassword());
                 naukri.uploadResume(resumePath);
             } catch (Exception e) {

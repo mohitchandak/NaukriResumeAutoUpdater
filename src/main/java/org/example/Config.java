@@ -11,6 +11,8 @@ public class Config {
     private final String resumeFileName;
     private final int runEverySecs;
     private final boolean headless;
+    private final String gmailAddress;
+    private final String gmailAppPassword;
 
     public Config() {
         Properties props = new Properties();
@@ -34,18 +36,25 @@ public class Config {
 
         String headlessValue = props.getProperty("browser.headless", System.getenv().getOrDefault("BROWSER_HEADLESS", "true"));
         this.headless = Boolean.parseBoolean(headlessValue);
+
+        String gmail = readOptionalValue("gmail.address", "GMAIL_ADDRESS", props);
+        this.gmailAddress = (gmail == null || gmail.trim().isEmpty()) ? this.email : gmail.trim();
+        this.gmailAppPassword = readOptionalValue("gmail.app.password", "GMAIL_APP_PASSWORD", props);
     }
 
     private String readRequiredValue(String configKey, String envKey, Properties props) {
+        String value = readOptionalValue(configKey, envKey, props);
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalStateException("Required configuration is missing. Set either config.properties or the environment variable " + envKey + " for " + configKey);
+        }
+        return value;
+    }
+
+    private String readOptionalValue(String configKey, String envKey, Properties props) {
         String value = System.getenv(envKey);
         if (value == null || value.trim().isEmpty()) {
             value = props.getProperty(configKey);
         }
-
-        if (value == null || value.trim().isEmpty()) {
-            throw new IllegalStateException("Required configuration is missing. Set either config.properties or the environment variable " + envKey + " for " + configKey);
-        }
-
         return value;
     }
 
@@ -71,5 +80,17 @@ public class Config {
 
     public boolean isHeadless() {
         return headless;
+    }
+
+    public String getGmailAddress() {
+        return gmailAddress;
+    }
+
+    public String getGmailAppPassword() {
+        return gmailAppPassword;
+    }
+
+    public boolean hasGmailOtpConfig() {
+        return gmailAppPassword != null && !gmailAppPassword.trim().isEmpty();
     }
 }

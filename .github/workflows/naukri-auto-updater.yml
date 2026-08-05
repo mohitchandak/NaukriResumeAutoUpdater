@@ -34,6 +34,8 @@ jobs:
           NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
           RESUME_PDF_URL: ${{ secrets.RESUME_PDF_URL }}
           RESUME_FILE_NAME: ${{ secrets.RESUME_FILE_NAME }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           BROWSER_HEADLESS: 'true'
         run: java -jar target/nakuri-1.0-SNAPSHOT.jar
 
