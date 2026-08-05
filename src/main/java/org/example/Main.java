@@ -24,12 +24,15 @@ public class Main {
             NaukriAutomation naukri = null;
             try {
                 GmailOtpReader otpReader = null;
-                if (config.hasGmailOtpConfig()) {
+                boolean useOtpLogin = config.hasGmailOtpConfig();
+                if (useOtpLogin) {
                     otpReader = new GmailOtpReader(config.getGmailAddress(), config.getGmailAppPassword());
-                    System.out.println("Gmail OTP fallback enabled (only used if Naukri asks after password login)");
+                    System.out.println("Using 'Use OTP to Login' + Gmail OTP reader");
+                } else {
+                    System.out.println("Using email + password login (no GMAIL_APP_PASSWORD)");
                 }
                 naukri = new NaukriAutomation(config.isHeadless(), otpReader);
-                naukri.login(config.getEmail(), config.getPassword());
+                naukri.login(config.getEmail(), config.getPassword(), useOtpLogin);
                 naukri.uploadResume(resumePath);
             } catch (Exception e) {
                 e.printStackTrace();

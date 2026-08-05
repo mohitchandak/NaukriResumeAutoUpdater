@@ -59,8 +59,11 @@ public class NaukriAutomation {
         );
     }
 
-    /** Always uses email + password + Login (not "Use OTP to Login"). */
-    public void login(String email, String password) {
+    /**
+     * @param preferOtpLogin when true (Gmail configured / CI), uses "Use OTP to Login".
+     *                       when false, uses email + password Login button.
+     */
+    public void login(String email, String password, boolean preferOtpLogin) {
         try {
             driver.get("https://www.naukri.com/nlogin/login");
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(45));
@@ -71,20 +74,12 @@ public class NaukriAutomation {
             emailField.clear();
             emailField.sendKeys(email);
 
-            WebElement passwordField = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("passwordField")));
-            passwordField.clear();
-            passwordField.sendKeys(password);
-
             Instant otpNotBefore = Instant.now();
-            // Both Login and "Use OTP to Login" are type=submit — click Login only
-            WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.xpath("//button[@type='submit' and not(contains(@class,'otpButton'))]")
-            ));
-            loginButton.click();
-            logger.info("Submitted email + password login");
-
-            // Rare on home IP; common on GitHub Actions datacenter IPs
-            handleMfaOtpIfPresent(otpNotBefore);
+            if (preferOtpLogin) {
+                loginWithOtpButton(wait, otpNotBefore);
+            } else {
+                loginWithPassword(wait, password, otpNotBefore);
+            }
 
             waitForLoggedInState(wait);
             logger.info("Logged in successfully");
@@ -100,6 +95,33 @@ public class NaukriAutomation {
         }
     }
 
+    private void loginWithPassword(WebDriverWait wait, String password, Instant otpNotBefore) throws Exception {
+        WebElement passwordField = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("passwordField")));
+        passwordField.clear();
+        passwordField.sendKeys(password);
+
+        WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//button[@type='submit' and not(contains(@class,'otpButton'))]")
+        ));
+        loginButton.click();
+        logger.info("Submitted email + password login");
+        handleMfaOtpIfPresent(otpNotBefore);
+    }
+
+    /** Email field + "Use OTP to Login" — reads the emailed code from Gmail. */
+    private void loginWithOtpButton(WebDriverWait wait, Instant otpNotBefore) throws Exception {
+        if (otpReader == null) {
+            throw new IllegalStateException("OTP login requires GMAIL_APP_PASSWORD");
+        }
+
+        WebElement otpLoginButton = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("button.otpButton")));
+        otpLoginButton.click();
+        logger.info("Clicked 'Use OTP to Login' — waiting for OTP inputs and Gmail code");
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("Input_1")));
+        enterOtpFromGmail(otpNotBefore);
+    }
+
     private void handleMfaOtpIfPresent(Instant otpNotBefore) throws Exception {
         WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(12));
         try {
@@ -108,12 +130,14 @@ public class NaukriAutomation {
             logger.info("No extra OTP after password login");
             return;
         }
+        logger.info("Naukri showed verification OTP after password login");
+        enterOtpFromGmail(otpNotBefore);
+    }
 
-        logger.info("Naukri showed an extra verification OTP after password login");
+    private void enterOtpFromGmail(Instant otpNotBefore) throws Exception {
         if (otpReader == null) {
             throw new IllegalStateException(
-                    "Naukri asked for email OTP (usually on new/cloud IPs). "
-                            + "Set GMAIL_APP_PASSWORD to auto-read it, or run from a trusted network."
+                    "Naukri asked for email OTP. Set GMAIL_APP_PASSWORD to auto-read it."
             );
         }
 
@@ -136,7 +160,7 @@ public class NaukriAutomation {
                     By.xpath("//button[contains(.,'Verify')]")
             )).click();
         }
-        logger.info("Submitted verification OTP");
+        logger.info("Submitted OTP from Gmail");
     }
 
     public void uploadResume(String resumePath) throws InterruptedException {
