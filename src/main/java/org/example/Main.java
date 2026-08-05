@@ -10,6 +10,7 @@ public class Main {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public static void main(String[] args) {
+        int exitCode = 0;
         try {
             Config config = new Config();
             String datedFileName = withTodayDate(config.getResumeFileName());
@@ -27,6 +28,7 @@ public class Main {
                 naukri.uploadResume(resumePath);
             } catch (Exception e) {
                 e.printStackTrace();
+                exitCode = 1;
             } finally {
                 if (naukri != null) {
                     naukri.quit();
@@ -34,8 +36,14 @@ public class Main {
             }
         } catch (IOException e) {
             System.err.println("Failed to download resume: " + e.getMessage());
+            exitCode = 1;
         } catch (IllegalStateException e) {
             System.err.println("Configuration error: " + e.getMessage());
+            exitCode = 1;
+        }
+
+        if (exitCode != 0) {
+            System.exit(exitCode);
         }
     }
 

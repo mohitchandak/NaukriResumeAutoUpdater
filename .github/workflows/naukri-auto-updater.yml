@@ -36,3 +36,11 @@ jobs:
           RESUME_FILE_NAME: ${{ secrets.RESUME_FILE_NAME }}
           BROWSER_HEADLESS: 'true'
         run: java -jar target/nakuri-1.0-SNAPSHOT.jar
+
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: naukri-debug
+          path: debug/
+          if-no-files-found: ignore

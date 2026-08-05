@@ -8,6 +8,9 @@ config.properties
 *.pdf
 !resume/*.pdf
 
+# Selenium failure dumps from CI/local
+debug/
+
 # IDE / OS
 .idea/
 *.iml
