@@ -3,19 +3,49 @@ name: Naukri Auto Updater
 on:
   workflow_dispatch:
   schedule:
-    # Hourly 9:00–19:00 IST (03:30–13:30 UTC), Monday–Friday
-    # GitHub cron is always UTC; IST = UTC+5:30
-    - cron: '30 3-13 * * 1-5'
+    # GitHub cron is UTC and best-effort (can delay/skip under load).
+    # Two staggered triggers per UTC hour improve odds of at least one run
+    # during Mon–Fri ~9:00–19:00 IST (UTC+5:30).
+    # Avoid :00/:30 which are the most congested.
+    - cron: '12 3-13 * * 1-5'
+    - cron: '42 3-13 * * 1-5'
+
+concurrency:
+  group: naukri-auto-updater
+  cancel-in-progress: false
 
 jobs:
   run-updater:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check Mon–Fri 9:00–19:00 IST window
+        id: window
+        run: |
+          set -euo pipefail
+          IST_NOW="$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M %u')"
+          HOUR="$(TZ=Asia/Kolkata date +%H)"
+          DOW="$(TZ=Asia/Kolkata date +%u)"
+          echo "IST now: $IST_NOW (dow=$DOW hour=$HOUR)"
+          # Manual runs always proceed
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 1=Mon … 5=Fri; hour 09–19 inclusive
+          if [ "$DOW" -ge 1 ] && [ "$DOW" -le 5 ] && [ "$HOUR" -ge 9 ] && [ "$HOUR" -le 19 ]; then
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Outside IST business window — skipping upload"
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.window.outputs.in_window == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Java 11
+        if: steps.window.outputs.in_window == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,12 +53,15 @@ jobs:
           cache: maven
 
       - name: Setup Chrome
+        if: steps.window.outputs.in_window == 'true'
         uses: browser-actions/setup-chrome@v1
 
       - name: Build project
+        if: steps.window.outputs.in_window == 'true'
         run: mvn -B clean package -q
 
       - name: Run updater
+        if: steps.window.outputs.in_window == 'true'
         env:
           NAUKRI_EMAIL: ${{ secrets.NAUKRI_EMAIL }}
           NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
@@ -41,7 +74,7 @@ jobs:
         run: java -jar target/nakuri-1.0-SNAPSHOT.jar
 
       - name: Upload debug artifacts on failure
-        if: failure()
+        if: failure() && steps.window.outputs.in_window == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: naukri-debug

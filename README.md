@@ -34,10 +34,22 @@ Java + Selenium tool that downloads your resume PDF and uploads it to Naukri. De
 
 ## GitHub Actions (hourly Mon–Fri, 9 AM–7 PM IST)
 
-The workflow runs **automatically once per hour from 9:00 to 19:00 IST, Monday–Friday**. You can also trigger it manually with **Run workflow**.
+The workflow targets **about once per hour from 9:00 to 19:00 IST, Monday–Friday**. You can also trigger it manually with **Run workflow**.
 
-Cron used (UTC): `30 3-13 * * 1-5`  
-→ 03:30–13:30 UTC = 09:00–19:00 IST
+GitHub’s built-in `schedule` is **best-effort** (can delay or skip under load). To improve odds we use:
+
+- **Two staggered crons** each hour (UTC `:12` and `:42`, hours 03–13) — more chances than a single `:30` trigger
+- **IST time gate** — if a delayed job starts outside 9–19 IST, it skips the upload
+- **Concurrency group** — avoids messy overlapping runs
+
+Cron (UTC):
+```text
+12 3-13 * * 1-5
+42 3-13 * * 1-5
+```
+
+This is the best we can do **inside GitHub alone**. It is still not a hard guarantee of 11 runs/day. For near-real hourly reliability, use an external cron calling `workflow_dispatch` (optional next step).
+
 
 ### 1. Push the repo
 
@@ -91,7 +103,7 @@ After that, it runs on the schedule automatically.
 
 ### Notes
 
-- GitHub may delay scheduled jobs by a few minutes.
+- GitHub schedule can still delay or skip hours under load; dual cron + IST gate is mitigation, not a guarantee.
 - Keep the repo **private** if you prefer; free minutes apply on the free plan.
 - Do not put passwords in committed files — use secrets only.
 - Prefer bundling the PDF under `resume/` so Actions does not depend on Google Drive.
