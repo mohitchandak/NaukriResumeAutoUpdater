@@ -111,7 +111,7 @@ After that, it runs on the schedule automatically.
 ## What it does
 
 1. Uses the bundled PDF from `resume/<RESUME_FILE_NAME>` when present (recommended for GitHub Actions), otherwise downloads from `RESUME_PDF_URL`
-2. Renames it with today’s IST date (e.g. `Mohit_Chandak_SDET.pdf` → `Mohit_Chandak_SDET_2026-08-05.pdf`)
+2. Renames it with today’s IST day + month (e.g. `Mohit_Chandak_SDET.pdf` → `Mohit_Chandak_SDET_8_Sep.pdf`)
 3. Logs in to Naukri; if email OTP is shown, reads it from Gmail and submits it
 4. Uploads the dated resume
 5. Exits (scheduling is handled by GitHub Actions, not the Java process)

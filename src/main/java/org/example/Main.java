@@ -7,10 +7,13 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Locale;
 
 public class Main {
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    /** e.g. 8_Sep, 6_Oct (day + short month, IST) */
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("d_MMM", Locale.ENGLISH);
     private static final Path COOKIE_FILE = Paths.get("naukri-cookies.json");
 
     public static void main(String[] args) {
